@@ -1,0 +1,136 @@
+{
+  "content_bar": [
+    "//div[@role='button']//span[contains(text(), 'Write something')]",
+    "//div[@role='button']//span[contains(text(), 'Bạn viết gì đi')]",
+    "//div[@role='region']//div[@role='button'][descendant::span]",
+    "//div[@role='main']//div[@role='button']//span[contains(text(), 'Tạo bài viết') or contains(text(), 'Create post')]"
+  ],
+  "create_post_modal": [
+    "//div[@role='dialog']//div[@role='textbox' and @contenteditable='true']",
+    "//div[@role='dialog']//div[@role='textbox']",
+    "//div[@aria-label='Create a public post' or @aria-label='Tạo bài viết công khai']//div[@role='textbox']",
+    "//div[@role='presentation']//div[@role='textbox' and @contenteditable='true']"
+  ],
+  "post_button": [
+    "//div[@role='dialog']//div[@aria-label='Post' or @aria-label='Đăng' or @aria-label='Đăng bài' or @aria-label='Đăng bài viết']",
+    "//div[@aria-label='Post' or @aria-label='Đăng' or @aria-label='Đăng bài' or @aria-label='Publish']",
+    "//div[@role='dialog']//div[@role='button' and (contains(@aria-label, 'Post') or contains(@aria-label, 'Đăng'))]",
+    "//div[@role='dialog']//div[@role='button'][descendant::span[contains(., 'Post') or contains(., 'Đăng')]]",
+    "//div[@role='button' and (descendant::span[contains(text(), 'Post') or contains(text(), 'Đăng')])]",
+    "//button[descendant::span[contains(text(), 'Post') or contains(text(), 'Đăng')]]",
+    "//div[@role='dialog']//button[contains(., 'Post') or contains(., 'Đăng')]"
+  ],
+  "next_button": [
+    "//div[@role='dialog']//div[@aria-label='Tiếp' or @aria-label='Next']",
+    "//div[@role='dialog']//div[@role='button' and (contains(@aria-label, 'Tiếp') or contains(@aria-label, 'Next'))]",
+    "//div[@role='dialog']//div[@role='button'][descendant::span[contains(., 'Tiếp') or contains(., 'Next')]]"
+  ],
+  "search_bars": [
+    "//input[@placeholder='Search Facebook' and @aria-label='Search Facebook']",
+    "//input[@placeholder='Tìm kiếm trên Facebook' and @aria-label='Tìm kiếm trên Facebook']",
+    "//input[@type='search']",
+    "//input[contains(@placeholder, 'Search') or contains(@placeholder, 'Tìm kiếm')]"
+  ],
+  "authenticated_account": [
+    "//div[@aria-label='Tài khoản của bạn' or @aria-label='Your profile' or @aria-label='Account controls and settings']",
+    "//div[@role='navigation']//div[@aria-label='Messenger']",
+    "//div[@role='navigation']//div[@aria-label='Thông báo' or @aria-label='Notifications']",
+    "//div[@role='navigation']//a[contains(@href, '/me') or contains(@href, '/profile.php')]"
+  ],
+  "home_banner": [
+    "//div[@aria-label='Facebook' and @role='navigation']",
+    "//div[@role='navigation']//div[@aria-label='Messenger']"
+  ],
+  "email_input": [
+    "//input[@name='email']",
+    "//input[@id='email']",
+    "//input[@type='email' or @name='email']"
+  ],
+  "password_input": [
+    "//input[@name='pass']",
+    "//input[@id='pass']",
+    "//input[@type='password' or @name='pass']"
+  ],
+  "login_button": [
+    "//div[@role='button' and (contains(@aria-label, 'Log in') or contains(@aria-label, 'Log In') or contains(., 'Log in') or contains(., 'Log In') or contains(., 'Đăng nhập') or contains(., 'Đăng Nhập'))]",
+    "//*[@role='button' and (contains(@aria-label, 'Log in') or contains(@aria-label, 'Log In') or contains(@aria-label, 'Đăng nhập') or contains(@aria-label, 'Đăng Nhập'))]",
+    "//button[@name='login']",
+    "//button[@type='submit']",
+    "//button[@id='loginbutton']",
+    "//button[contains(., 'Log In') or contains(., 'Log in') or contains(., 'Đăng nhập') or contains(., 'Đăng Nhập')]",
+    "//input[@type='submit' or @name='login']"
+  ],
+  "marketplace_discussion_tab": [
+    "//a[contains(@href, '/discussion') or contains(span, 'Discussion') or contains(span, 'Thảo luận')]",
+    "//div[@role='tab'][descendant::span[contains(text(), 'Discussion') or contains(text(), 'Thảo luận')]]"
+  ],
+  "action_blocked_dialog": [
+    "//div[@role='dialog'][contains(., 'tạm thời bị chặn') or contains(., 'temporarily blocked') or contains(., 'You’re Temporarily Blocked') or contains(., 'Action Blocked')]",
+    "//div[@role='alertdialog']"
+  ],
+  "pending_approval_notice": [
+    "//span[contains(text(), 'quản trị viên duyệt') or contains(text(), 'admin approval') or contains(text(), 'Pending') or contains(text(), 'submitted for approval')]",
+    "//div[contains(., 'Bài viết của bạn đang chờ phê duyệt') or contains(., 'Your post is pending approval')]"
+  ],
+  "photo_video_button": [
+    "//div[@aria-label='Photo/video' or @aria-label='Ảnh/video' or @aria-label='Ảnh/Video']",
+    "//div[@role='button'][descendant::span[contains(text(), 'Ảnh/video') or contains(text(), 'Photo/video')]]",
+    "//div[@role='dialog']//div[contains(@aria-label, 'Photo') or contains(@aria-label, 'Ảnh')]"
+  ],
+  "file_input": [
+    "//div[@role='dialog']//input[@type='file' and contains(@accept, 'image')]",
+    "//input[@type='file' and contains(@accept, 'image')]",
+    "//div[@role='dialog']//input[@type='file']",
+    "//input[@type='file']"
+  ],
+  "image_upload_preview": [
+    "//div[@role='dialog']//img[contains(@src, 'blob:') or contains(@alt, 'Image') or contains(@alt, 'Ảnh')]",
+    "//div[@role='dialog']//div[contains(@aria-label, 'Preview') or contains(@aria-label, 'Xem trước')]"
+  ],
+  "join_group_button": [
+    "//div[(@role='button' or self::button) and not(contains(., 'Đã tham gia')) and not(contains(., 'Joined')) and not(contains(., 'Đang chờ')) and not(contains(., 'Pending'))][@aria-label='Tham gia nhóm' or @aria-label='Join group' or @aria-label='Join Group' or @aria-label='Tham gia' or @aria-label='Join']",
+    "//div[not(contains(., 'Đã tham gia')) and not(contains(., 'Joined')) and not(contains(., 'Đang chờ')) and not(contains(., 'Pending'))][@aria-label='Tham gia nhóm' or @aria-label='Join group' or @aria-label='Join Group']",
+    "//div[(@role='button' or self::button) and not(contains(., 'Đã tham gia')) and not(contains(., 'Joined')) and not(contains(., 'Đang chờ')) and not(contains(., 'Pending'))][descendant::span[normalize-space(text())='Tham gia nhóm' or normalize-space(text())='Join group' or normalize-space(text())='Join Group' or normalize-space(text())='Tham gia' or normalize-space(text())='Join']]",
+    "//div[(@role='button' or self::button) and not(contains(., 'Đã tham gia')) and not(contains(., 'Joined')) and not(contains(., 'Đang chờ')) and not(contains(., 'Pending'))]//span[normalize-space(text())='Tham gia nhóm' or normalize-space(text())='Join group' or normalize-space(text())='Join Group']",
+    "//button[not(contains(., 'Đã tham gia')) and not(contains(., 'Joined')) and not(contains(., 'Đang chờ')) and not(contains(., 'Pending'))][descendant::span[normalize-space(text())='Tham gia nhóm' or normalize-space(text())='Join group' or normalize-space(text())='Join Group' or normalize-space(text())='Tham gia' or normalize-space(text())='Join']]"
+  ],
+  "joined_indicator": [
+    "//div[(@role='button' or self::button) and (@aria-label='Đã tham gia' or @aria-label='Joined' or @aria-label='Joined group' or @aria-label='Đã tham gia nhóm')]",
+    "//div[@aria-label='Đã tham gia' or @aria-label='Joined' or @aria-label='Joined group' or @aria-label='Đã tham gia nhóm']",
+    "//div[(@role='button' or self::button) and (contains(., 'Đã tham gia') or contains(., 'Joined'))]",
+    "//div[(@role='button' or self::button) and (contains(@aria-label, 'Đã tham gia') or contains(@aria-label, 'Joined'))]",
+    "//div[(@role='button' or self::button)]//span[contains(normalize-space(.), 'Đã tham gia') or contains(normalize-space(.), 'Joined') or contains(normalize-space(.), 'Đã tham gia nhóm')]",
+    "//span[normalize-space(.)='Đã tham gia' or normalize-space(.)='Joined']",
+    "//div[(@role='button' or self::button) and (@aria-label='Mời' or @aria-label='Invite' or contains(@aria-label, 'Mời bạn bè'))]"
+  ],
+  "join_pending_indicator": [
+    "//div[@role='button'][@aria-label='Đang chờ' or @aria-label='Pending' or @aria-label='Hủy yêu cầu' or @aria-label='Cancel request']",
+    "//div[@aria-label='Đang chờ' or @aria-label='Pending' or @aria-label='Hủy yêu cầu' or @aria-label='Cancel request']",
+    "//div[@role='button']//span[contains(normalize-space(text()), 'Đang chờ') or contains(normalize-space(text()), 'Pending') or contains(normalize-space(text()), 'Hủy yêu cầu') or contains(normalize-space(text()), 'Cancel request')]",
+    "//div[@role='button'][descendant::span[contains(normalize-space(text()), 'Đang chờ') or contains(normalize-space(text()), 'Pending') or contains(normalize-space(text()), 'Hủy yêu cầu') or contains(normalize-space(text()), 'Cancel request')]]"
+  ],
+  "membership_questionnaire_dialog": [
+    "//div[@role='dialog'][descendant::span[contains(text(), 'câu hỏi') or contains(text(), 'questions') or contains(text(), 'quy tắc') or contains(text(), 'rules')]]",
+    "//div[@role='dialog']"
+  ],
+  "rules_agreement_checkbox": [
+    "//div[@role='dialog']//div[@role='checkbox' and (contains(., 'đồng ý') or contains(., 'quy tắc') or contains(., 'rules') or contains(., 'agree'))]",
+    "//div[@role='dialog']//label[contains(., 'đồng ý') or contains(., 'quy tắc') or contains(., 'rules') or contains(., 'agree')]//input[@type='checkbox']",
+    "//div[@role='dialog']//input[@type='checkbox']",
+    "//div[@role='dialog']//div[@role='checkbox']"
+  ],
+  "question_radio_option": [
+    "//div[@role='dialog']//div[@role='radiogroup']//div[@role='radio']",
+    "//div[@role='dialog']//div[@role='radio']",
+    "//div[@role='dialog']//input[@type='radio']"
+  ],
+  "question_text_input": [
+    "//div[@role='dialog']//textarea",
+    "//div[@role='dialog']//input[@type='text']"
+  ],
+  "submit_join_button": [
+    "//div[@role='dialog']//div[@aria-label='Submit' or @aria-label='Gửi' or @aria-label='Hoàn tất' or @aria-label='Done']",
+    "//div[@role='dialog']//div[@role='button'][descendant::span[contains(text(), 'Submit') or contains(text(), 'Gửi') or contains(text(), 'Hoàn tất')]]",
+    "//div[@role='dialog']//button[descendant::span[contains(text(), 'Submit') or contains(text(), 'Gửi')]]"
+  ]
+}

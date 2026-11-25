@@ -1,0 +1,463 @@
+Facebook Automation
+
+Đặc tả giao diện và trải nghiệm người dùng
+
+Phiên bản 1.0  •  Ngày 21 tháng 11 năm 2026  •  Thiết kế desktop
+
+Ứng dụng hỗ trợ người vận hành chuẩn bị nhiều bài viết kèm hình ảnh, chọn nhóm mục tiêu, kiểm tra kế hoạch và theo dõi một phiên đăng. Luồng chính gồm ba tab: Cấu hình và Tài khoản, Nội dung và Nhóm mục tiêu, Vận hành và Giám sát.
+
+Tài liệu dùng để bàn giao thiết kế cho người phát triển và kiểm thử. Bố cục, nội dung và màu sắc tham chiếu bộ mẫu Canva 12 màn. Các quy tắc tương tác và xử lý lỗi được ghi là đề xuất triển khai; chúng không phải xác nhận chức năng đã có trong ứng dụng.
+
+Mở bộ mẫu UI trên Canva
+
+Phạm vi thiết kế
+
+Hai giao diện sáng và tối có cùng nội dung và cách thao tác; khung thiết kế 1440 × 900 px.
+
+Quản lý danh sách bài viết và nhiều ảnh riêng cho từng bài. Không có khung xem trước bài đăng.
+
+Giữ hình dáng SF Pro của Apple bằng chữ vector trong Canva. Nội dung chữ không sửa bằng thao tác gõ trực tiếp.
+
+Danh mục màn hình
+
+Màn hình
+
+Tab
+
+Canva sáng
+
+Canva tối
+
+Cấu hình và tài khoản
+
+01
+
+1
+
+7
+
+Danh sách bài viết và hình ảnh
+
+02
+
+2
+
+8
+
+Nhóm mục tiêu và cách đăng
+
+02
+
+3
+
+9
+
+Kết quả chạy thử
+
+03
+
+4
+
+10
+
+Giám sát phiên đang chạy
+
+03
+
+5
+
+11
+
+Xác nhận dừng phiên
+
+03
+
+6
+
+12
+
+Các khái niệm cần phân biệt
+
+Bài viết là nội dung đã soạn cùng danh sách ảnh. Nhóm là đích nhận bài. Một lượt đăng là việc gửi một bài vào một nhóm. Một phiên là tập các lượt đăng được xử lý trong một lần chạy. Giới hạn 10 lượt không có nghĩa phải chuẩn bị 10 bài khác nhau.
+
+01 Cấu hình và tài khoản
+
+Mục tiêu là chuẩn bị tài khoản và giới hạn trước khi sang nội dung. Mật khẩu được che mặc định; trạng thái đăng nhập được thể hiện riêng với trạng thái lưu cấu hình.
+
+Hình 1  Cấu hình và tài khoản  Canva trang 1 sáng và trang 7 tối
+
+Thiết lập
+
+Mặc định
+
+Quy tắc nhập
+
+Email và mật khẩu
+
+Người dùng nhập
+
+Không được trống khi bắt đầu đăng thật.
+
+Chờ tối thiểu và tối đa
+
+45 và 90 giây
+
+Tối thiểu ≥ 0; tối đa ≥ tối thiểu.
+
+Lượt đăng tối đa mỗi phiên
+
+10 lượt
+
+Số nguyên lớn hơn 0.
+
+Thời gian chờ của nhóm
+
+24 giờ
+
+Lớn hơn 0; hiển thị thời gian còn lại của từng nhóm.
+
+Timeout và cổng trình duyệt
+
+15 giây và 9224
+
+Timeout > 0; cổng từ 1024 đến 65535.
+
+Hành vi đề xuất: Nạp cấu hình điền các giá trị đã lưu; Lưu cấu hình báo thành công tại chỗ. Khi dữ liệu không hợp lệ, giữ nguyên nội dung người dùng nhập và đặt thông báo ngay dưới trường cần sửa.
+
+Tiếp tục chuyển sang tab Nội dung và Nhóm mục tiêu. Nhãn “Chưa kiểm tra đăng nhập” không được đổi thành “Đã đăng nhập” chỉ vì lưu cấu hình thành công.
+
+02 Nhiều bài viết và hình ảnh
+
+Tab Nội dung có hai mục con: Bài viết và Nhóm mục tiêu. Danh sách bên trái dùng để chọn bài cho phiên; vùng bên phải chỉnh nội dung và ảnh của một bài tại một thời điểm.
+
+Hình 2  Danh sách bài và ảnh đính kèm  Canva trang 2 sáng và trang 8 tối
+
+Thao tác với bài viết
+
+Thêm bài tạo một bản nháp. Mỗi bài có tên nội bộ, nội dung, danh sách ảnh và thứ tự. Nhân bản tạo bài mới để chỉnh độc lập. Xóa bài loại bài khỏi danh sách sau xác nhận. Tìm kiếm lọc danh sách mà không làm mất lựa chọn đã có.
+
+Ô chọn xác định bài được dùng trong phiên; dòng đang mở được tô nền riêng. Kéo tay nắm để đổi thứ tự. Bản nháp chưa hoàn chỉnh vẫn lưu được nhưng chưa đủ điều kiện tham gia phiên đăng.
+
+Thao tác với hình ảnh
+
+Mỗi bài hỗ trợ nhiều ảnh. Người dùng kéo thả hoặc chọn nhiều tệp; danh sách hiển thị hình thu nhỏ, tên tệp, số thứ tự và nút xóa từng ảnh. Kéo ảnh để đổi thứ tự; ảnh đầu tiên là ảnh bìa trong phương án hiện tại. Các định dạng đề xuất là JPG, PNG và WEBP.
+
+Lưu bài viết lưu nội dung cùng thứ tự ảnh. Đề xuất yêu cầu ít nhất một ảnh hợp lệ cho bài được chọn chạy; bài không có ảnh vẫn có thể giữ ở dạng nháp. Các giới hạn số ảnh và dung lượng cần chốt khi triển khai tải ảnh.
+
+03 Nhóm mục tiêu và cách đăng
+
+Danh sách nhóm giữ chức năng thêm, nhập danh sách, tìm kiếm, chọn và xóa. Mỗi dòng hiển thị lần đăng gần nhất cùng trạng thái sẵn sàng hoặc thời gian chờ còn lại.
+
+Hình 3  Nhóm mục tiêu và phân bổ bài  Canva trang 3 sáng và trang 9 tối
+
+Phương án luân phiên trong mẫu
+
+Đọc các bài đã chọn theo thứ tự; lần lượt ghép một bài với một nhóm đủ điều kiện. Hết danh sách bài thì quay lại bài đầu. Mỗi nhóm nhận một bài trong phiên. Các nhóm đang chờ được bỏ qua trước khi phân bổ.
+
+Nhóm đủ điều kiện
+
+Bài được dùng
+
+Ảnh đi kèm
+
+Nhóm 1, 4, 7
+
+Bài 01 Cẩm nang làm việc
+
+3 ảnh của bài 01
+
+Nhóm 2, 5, 8
+
+Bài 02 Checklist hằng ngày
+
+2 ảnh của bài 02
+
+Nhóm 3, 6, 9
+
+Bài 03 Mẹo tập trung
+
+1 ảnh của bài 03
+
+Ví dụ minh họa có 4 bản nháp, chọn 3 bài với tổng 6 ảnh; 12 nhóm gồm 9 nhóm sẵn sàng và 3 nhóm đang chờ. Giới hạn 10 lượt tạo kế hoạch 9 lượt, mỗi bài dùng 3 lần. “6 ảnh” là số ảnh của các bài đã chọn, không phải tổng số lần tải ảnh trong phiên.
+
+Đề xuất triển khai: loại URL trùng; báo rõ dòng nhập sai; tính lại kế hoạch sau khi sửa nhóm, thứ tự bài hoặc lựa chọn. Số lượt dự kiến bằng số nhóm đã chọn đủ điều kiện, giới hạn bởi mức tối đa mỗi phiên.
+
+04 Chạy thử và kiểm tra trước khi đăng
+
+Màn này giúp người vận hành biết nội dung nào sẽ được dùng và bao nhiêu nhóm sẽ nhận bài. Chạy thử và kiểm tra DOM là hai thao tác riêng.
+
+Hình 4  Kết quả chạy thử  Canva trang 4 sáng và trang 10 tối
+
+Thao tác
+
+Kết quả mong đợi
+
+Chạy thử
+
+Tính kế hoạch, kiểm tra bài và tệp ảnh, lọc nhóm đang chờ. Không mở trình duyệt và không đăng bài.
+
+Kiểm tra DOM
+
+Mở trình duyệt để kiểm tra thành phần trang Facebook có thể được tìm thấy. Không phải xác nhận bài đã được đăng.
+
+Bắt đầu đăng
+
+Tạo phiên từ kế hoạch đã kiểm tra, chuyển sang trạng thái đang chạy và ghi nhật ký.
+
+Điều kiện bắt đầu đề xuất
+
+Cấu hình hợp lệ; có ít nhất một bài được chọn với nội dung và ảnh hợp lệ; có ít nhất một nhóm đủ điều kiện; không còn thao tác tải ảnh đang dở; không có phiên khác đang chạy. Bấm Bắt đầu đăng nhiều lần chỉ được tạo một phiên.
+
+Mẫu hiện cho phép nút Bắt đầu đăng hoạt động khi kiểm tra DOM chưa chạy. Giữ kiểm tra DOM là thao tác riêng; nếu kiểm tra đã chạy và phát hiện lỗi nghiêm trọng thì chặn bắt đầu, nêu thành phần cần kiểm tra lại. Khi thay đổi đầu vào, đánh dấu kết quả chạy thử cũ và tính lại kế hoạch.
+
+05 Giám sát phiên đang chạy
+
+Người vận hành cần nhìn thấy tiến độ tổng, trạng thái từng nhóm, bài và ảnh được dùng, thời gian chờ cùng sự kiện mới nhất. Nhật ký cập nhật mà không làm gián đoạn thao tác trên giao diện.
+
+Hình 5  Giám sát bài viết theo nhóm  Canva trang 5 sáng và trang 11 tối
+
+Chỉ số trong ví dụ
+
+Giá trị
+
+Ý nghĩa
+
+Đã xử lý
+
+5 trên 9
+
+Số lượt đã có kết quả, gồm thành công và chờ duyệt.
+
+Đã đăng và chờ duyệt
+
+4 và 1
+
+Hai kết quả khác nhau; chờ duyệt không được tính là đã hiển thị công khai.
+
+Còn lại và lỗi
+
+4 và 0
+
+Còn 4 lượt trong kế hoạch; chưa ghi nhận lượt thất bại.
+
+Bài tiếp theo
+
+Bài 03 kèm 1 ảnh
+
+Đích đến là nhóm Cộng đồng Sáng tạo, sau 42 giây.
+
+Đề xuất trạng thái vận hành: đang chuẩn bị, đang tải ảnh, đang gửi, chờ giữa các lượt, đang dừng, đã dừng, hoàn tất hoặc cần xử lý. Luôn có nhãn chữ đi cùng màu. Nếu chưa xác định được bài đã gửi hay chưa, hiển thị “Cần kiểm tra”, không tự đánh dấu thành công và không tự đăng lại.
+
+Trong phiên, khóa thao tác thay đổi cấu hình, bài, ảnh và nhóm của kế hoạch hiện tại. Vẫn cho phép đọc thông tin, lọc nhật ký và yêu cầu dừng. Tự cuộn nhật ký có thể tắt để đọc sự kiện cũ.
+
+06 Dừng phiên và kết thúc
+
+Nút Dừng phiên mở hộp xác nhận, nêu rõ thời điểm dừng và phần việc còn lại. Hộp thoại không được tạo cảm giác các lượt trước đã bị hủy hoặc xóa.
+
+Hình 6  Xác nhận dừng  Canva trang 6 sáng và trang 12 tối
+
+Khi xác nhận dừng
+
+“Tiếp tục chạy” đóng hộp thoại và giữ phiên hiện tại.
+
+“Dừng sau thao tác hiện tại” chuyển sang Đang dừng; hoàn tất việc đang xử lý rồi không bắt đầu lượt kế tiếp.
+
+Nếu đang chờ giữa các lượt, kết thúc chờ và dừng ngay. Các nhóm chưa xử lý tiếp tục mang trạng thái chưa đăng.
+
+Giữ kết quả, thời điểm, bài và nhóm đã xử lý; không đặt lại các bộ đếm về 0. Khi dừng xong, bật lại thao tác chỉnh sửa và bắt đầu phiên mới.
+
+Phản hồi kết thúc đề xuất
+
+Hiển thị nguyên nhân kết thúc, tổng lượt đã xử lý, số đã đăng, chờ duyệt, lỗi và chưa xử lý. Chạy lại là một phiên mới: phải kiểm tra lịch sử và thời gian chờ trước khi tạo kế hoạch, không mặc định gửi lại các lượt đã có kết quả.
+
+Hộp thoại giữ focus bên trong; Escape tương đương Tiếp tục chạy. Sau khi đóng, trả focus về nút Dừng phiên. Trạng thái đang dừng cần có phản hồi ngay để người dùng không bấm lặp.
+
+07 Quy chuẩn giao diện sáng và tối
+
+Hai chế độ dùng chung bố cục, nhãn, lựa chọn và trạng thái; đổi giao diện không làm mất dữ liệu đang soạn. Ảnh đính kèm giữ nguyên màu gốc.
+
+Hình 7  Màn bài viết ở giao diện tối  Canva trang 8
+
+Vai trò
+
+Sáng
+
+Tối
+
+Nền trang
+
+F4F6FA
+
+0B1019
+
+Nền khối nội dung
+
+FFFFFF
+
+131C2B
+
+Nền trường nhập
+
+F1F4F9
+
+192437
+
+Chữ chính
+
+19283D
+
+F3F6FC
+
+Chữ phụ và đường viền
+
+596A80 và DCE3EE
+
+A1B0C7 và 29374E
+
+Nút chính và màu nhấn
+
+467AF4 và 3169DC
+
+467AF4 và 6996FF
+
+Chữ UI dùng SF Pro: tiêu đề màn 28 px, tiêu đề khối 18–19 px, nội dung và trường nhập 14–17 px, nhãn phụ 12–13 px. Cỡ 10–11 px chỉ dùng cho chú thích mẫu, không dùng cho thông tin quyết định thao tác. Khoảng cách chính theo bước 8 px; nút cao 34–42 px; góc bo 8–10 px.
+
+Đề xuất triển khai: dùng font hệ thống của Apple trên macOS; phương án dự phòng cần kiểm tra lại độ rộng chữ trên hệ điều hành khác. Chữ SVG trong Canva phục vụ giữ hình dáng; trong ứng dụng thật, dùng văn bản để hỗ trợ chọn chữ và công cụ trợ năng.
+
+08 Trạng thái trống lỗi và phản hồi
+
+Các trạng thái sau là yêu cầu UX đề xuất bổ sung khi triển khai. Thông báo phải đặt gần đối tượng gây lỗi, giữ dữ liệu đang soạn và chỉ ra hành động tiếp theo.
+
+Tình huống
+
+Phản hồi và hành động
+
+Chưa có bài viết
+
+“Chưa có bài viết. Thêm bài để bắt đầu.” Hiển thị nút Thêm bài; chưa cho bắt đầu đăng.
+
+Chưa chọn bài cho phiên
+
+“Chọn ít nhất một bài viết.” Giữ danh sách bản nháp và lựa chọn nhóm.
+
+Bài được chọn thiếu nội dung hoặc ảnh
+
+Đánh dấu đúng bài và trường cần sửa. Cho lưu nháp; chặn dùng bài chưa hợp lệ trong phiên.
+
+Ảnh lỗi hoặc tệp không còn tồn tại
+
+Hiển thị tên tệp, lý do và nút Chọn lại hoặc Xóa. Không tự bỏ ảnh rồi đăng nội dung thiếu.
+
+Ảnh đang được xử lý
+
+Hiển thị tiến độ trên từng ảnh; chưa báo đã lưu đầy đủ hoặc cho bắt đầu phiên.
+
+Nhập nhóm có URL trùng hoặc sai
+
+Báo số dòng hợp lệ, số trùng và số lỗi; giữ các dòng lỗi để sửa. Không tạo nhóm trùng.
+
+Không còn nhóm đủ điều kiện
+
+“Các nhóm đang trong thời gian chờ.” Hiển thị mốc gần nhất có thể thử lại; không tạo phiên rỗng.
+
+Đổi bài khi chưa lưu
+
+Hỏi Lưu thay đổi, Bỏ thay đổi hoặc Tiếp tục chỉnh sửa. Hủy thao tác phải giữ toàn bộ nội dung và thứ tự ảnh.
+
+Mất phiên đăng nhập hoặc trình duyệt
+
+Hiển thị Cần xử lý và nguyên nhân; dừng nhận lượt mới. Giữ trạng thái kết quả chưa xác định để người dùng kiểm tra.
+
+Không lưu được dữ liệu
+
+“Chưa lưu được thay đổi. Thử lại.” Giữ dữ liệu trong giao diện; không hiển thị trạng thái Đã lưu.
+
+Tương tác và khả năng tiếp cận
+
+Tab di chuyển theo thứ tự nhìn; có focus rõ; Enter kích hoạt nút và Space chọn ô. Khi xóa bài hoặc ảnh, tên đối tượng phải có trong nhãn cho trình đọc màn hình. Bổ sung nút Lên và Xuống hoặc phím tương đương cho thao tác kéo thả. Nhãn trạng thái luôn đủ nghĩa ngay cả khi không phân biệt màu.
+
+Ở cửa sổ nhỏ hơn khung mẫu, giữ phần soạn thảo đủ rộng, cho cuộn nội dung và giữ hành động Lưu ở vị trí dễ tìm. Kiểm tra phóng to giao diện, tên bài dài và đường dẫn ảnh dài trước khi chốt kích thước tối thiểu. Các phương án này chưa có màn responsive riêng trong bộ Canva.
+
+09 Tiêu chí nghiệm thu và bàn giao
+
+Các tiêu chí dưới đây dùng để đánh giá bản triển khai, chưa phải kết quả kiểm thử của mẫu Canva. Dùng cùng một bộ dữ liệu ở cả giao diện sáng và tối.
+
+Mã
+
+Tình huống kiểm tra
+
+Kết quả mong đợi
+
+UX01
+
+Tạo nhiều bài, chọn 3 trong 4 bài
+
+Chỉ 3 bài đã chọn xuất hiện trong kế hoạch.
+
+UX02
+
+Đính kèm, xóa và đổi thứ tự ảnh
+
+Mỗi bài giữ bộ ảnh riêng; lưu và mở lại đúng thứ tự.
+
+UX03
+
+Nhân bản rồi sửa bài mới
+
+Nội dung và danh sách ảnh của bài gốc không đổi.
+
+UX04
+
+3 bài, 9 nhóm sẵn sàng, tối đa 10 lượt
+
+Tạo 9 lượt theo chu kỳ 01, 02, 03; mỗi nhóm một bài.
+
+UX05
+
+Tất cả nhóm đang chờ hoặc không chọn bài
+
+Có lý do rõ ràng; không tạo phiên rỗng.
+
+UX06
+
+Chạy thử và kiểm tra DOM
+
+Chạy thử không mở trình duyệt; cả hai thao tác không đăng bài.
+
+UX07
+
+Bấm Bắt đầu liên tục
+
+Chỉ một phiên chạy; giao diện vẫn phản hồi.
+
+UX08
+
+Dừng khi đang gửi và khi đang chờ
+
+Không tạo lượt kế tiếp; giữ kết quả và lịch sử.
+
+UX09
+
+Chuyển sáng tối và dùng bàn phím
+
+Giữ dữ liệu; focus, nhãn, thứ tự thao tác rõ ràng.
+
+UX10
+
+Mất ảnh hoặc mất kết nối sau thao tác gửi
+
+Không báo thành công sai; có trạng thái cần kiểm tra.
+
+Dữ liệu cần giữ qua các màn
+
+Bài viết cần mã ổn định, tên, nội dung, trạng thái nháp, lựa chọn, thứ tự và bộ ảnh có thứ tự. Nhóm cần URL đã chuẩn hóa, lựa chọn, lần đăng gần nhất và thời gian chờ. Phiên cần kế hoạch cố định cùng kết quả từng lượt gắn với mã bài, nhóm và thời điểm.
+
+Các quyết định cần chốt khi triển khai
+
+Giới hạn số ảnh và dung lượng mỗi ảnh; cách lưu tệp ảnh sau khi chọn; việc bắt buộc ảnh cho mọi bài chạy; xử lý lượt lỗi và kết quả chưa xác định; bắt đầu lại từ bài đầu hay tiếp tục vị trí luân phiên giữa hai phiên. Trong phạm vi mẫu hiện tại, mỗi phiên có tối đa một lượt cho mỗi nhóm và chưa có giao diện đặt lịch hoặc nhiều tài khoản.
+
+Tài liệu tham chiếu
+
+Bộ Canva Facebook Automation Nhiều bài viết và Hình ảnh gồm 12 trang, mã DAHbinmgNa4. Các giá trị mặc định đối chiếu config.py; ý nghĩa chạy thử và kiểm tra DOM đối chiếu main.py; lọc nhóm theo thời gian chờ đối chiếu services/state_manager.py.
+
+Ảnh minh họa trong UI lấy từ Unsplash. Liên kết nguồn nằm trong ghi chú trang 2 và 8 của bộ Canva. Các địa chỉ, tên nhóm, số lượt và thời điểm trong hình là dữ liệu minh họa.
