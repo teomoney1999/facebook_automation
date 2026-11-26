@@ -10,9 +10,9 @@ from pathlib import Path
 
 block_cipher = None
 
-# Base repository root directory
-SPECPATH = os.path.abspath(os.path.dirname(__file__))
-REPO_DIR = os.path.join(SPECPATH, "repo")
+# Base repository root directory (PyInstaller provides SPECPATH in spec namespace)
+BASE_DIR = os.path.abspath(globals().get("SPECPATH") or os.getcwd())
+REPO_DIR = os.path.join(BASE_DIR, "repo")
 
 # Static data files to include
 added_datas = [
