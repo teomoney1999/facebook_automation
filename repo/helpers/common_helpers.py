@@ -111,24 +111,42 @@ def human_delay(min_sec=1, max_sec=3):
     time.sleep(random.uniform(min_sec, max_sec))
 
 
+SYSTEM_GROUP_ROUTES = {"joins", "feed", "discover", "create", "search", "categories", "notifications", "your_posts"}
+
+
 def extract_facebook_group_urls(text: str) -> list:
     """
     Extracts clean, unique, normalized Facebook group URLs from any raw text.
+    Handles standard URLs, mobile/web subdomains, missing schemes (e.g. facebook.com/groups/xyz),
+    standalone numeric group IDs, and filters out internal system pages (joins, feed, etc.).
     Canonicalizes to https://www.facebook.com/groups/<group_id> to deduplicate
     fb.com vs facebook.com, query parameters, trailing slashes, and case.
     """
     if not text or not isinstance(text, str):
         return []
-    pattern = r"https?://(?:www\.)?(?:facebook\.com|fb\.com)/groups/([a-zA-Z0-9._\-]+)"
+    pattern = r"(?:https?://)?(?:[a-zA-Z0-9.-]+\.)?(?:facebook\.com|fb\.com)/groups/([a-zA-Z0-9._\-]+)"
     matches = re.finditer(pattern, text, flags=re.IGNORECASE)
     seen = set()
     result = []
     for m in matches:
-        group_id = m.group(1)
+        group_id = m.group(1).rstrip("/")
+        if group_id.lower() in SYSTEM_GROUP_ROUTES:
+            continue
         canonical = f"https://www.facebook.com/groups/{group_id}"
         if group_id.lower() not in seen:
             seen.add(group_id.lower())
             result.append(canonical)
+
+    # Support standalone numeric group IDs (8 to 20 digits, possibly prefixed with list numbering)
+    for line in text.splitlines():
+        if "/groups/" not in line:
+            num_match = re.search(r"\b(\d{8,20})\b", line)
+            if num_match:
+                gid = num_match.group(1)
+                if gid.lower() not in seen:
+                    seen.add(gid.lower())
+                    result.append(f"https://www.facebook.com/groups/{gid}")
+
     return result
 
 
@@ -238,6 +256,31 @@ def save_group_targets(filepath: str, groups: list) -> bool:
         }
         with open(target_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+
+def ensure_group_targets_file(filepath: str) -> bool:
+    """
+    Ensures links.json exists on disk with a valid empty schema contract
+    if it is missing, preventing missing file errors on fresh runs.
+    """
+    try:
+        target_path = str(filepath)
+        if not os.path.isabs(target_path):
+            if not os.path.exists(target_path):
+                if target_path.startswith("repo/") or target_path.startswith("repo\\"):
+                    candidate = os.path.join(BASE_DIR, target_path[5:])
+                    if os.path.exists(candidate):
+                        target_path = candidate
+                else:
+                    candidate = os.path.join(BASE_DIR, target_path)
+                    if os.path.exists(candidate):
+                        target_path = candidate
+
+        if not os.path.exists(target_path):
+            return save_group_targets(target_path, [])
         return True
     except Exception:
         return False

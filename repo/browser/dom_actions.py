@@ -156,6 +156,8 @@ def load_selectors(file_path: Union[str, Path]) -> Dict[str, List[str]]:
         raise ValueError(f"Invalid selectors.json format: expected dict, got {type(data).__name__}")
 
     for comp, sel_list in data.items():
+        if comp.startswith("_"):
+            continue
         if not isinstance(sel_list, list) or len(sel_list) == 0:
             raise ValueError(f"Component '{comp}' in selectors.json must have a non-empty list of selectors.")
 

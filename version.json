@@ -1,0 +1,16 @@
+{
+  "version": "2.0.0",
+  "release_date": "2026-11-26",
+  "changelog": [
+    "Phiên bản chính thức v2.0.0 với giao diện Desktop GUI",
+    "Hỗ trợ phân phối độc lập qua file cài đặt Windows (.exe)",
+    "Tích hợp tự động cập nhật ngầm và bảo vệ dữ liệu cá nhân Zero Data Loss",
+    "Tự động đồng bộ DOM Selectors qua Cloud khi Facebook thay đổi"
+  ],
+  "platforms": {
+    "windows": {
+      "url": "https://github.com/teomoney1999/facebook_automation/releases/download/v2.0.0/FacebookBotSetup.exe",
+      "sha256": ""
+    }
+  }
+}

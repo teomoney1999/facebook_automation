@@ -57,6 +57,9 @@ Tài liệu này định hình các nguyên tắc kỹ thuật, kiến trúc mã
 
 ## 4. Quy Trình Làm Việc Bắt Buộc Của Agent
 
+- **Xin Phép & Chờ Xác Nhận Trước Khi Triển Khai (BẮT BUỘC)**:
+  - Tuyệt đối **không tự ý code, sửa file, thêm tính năng mới, hay giao subagent triển khai** khi người dùng chưa đồng ý.
+  - Mọi tính năng mới hoặc thay đổi ngoài phạm vi người dùng yêu cầu trực tiếp phải được đề xuất trước và **dừng chờ người dùng xác nhận đồng ý** (ví dụ: `"Triển khai"`, `"OK"`, `"Làm đi"`) rồi mới bắt đầu thực thi.
 - **Giải Thích Trước Khi Làm**: Trước mỗi module/task, luôn giải thích rõ ràng 4 yếu tố:
   1. **Làm gì** (Mục tiêu và phạm vi thay đổi).
   2. **Vì sao làm** (Vấn đề hiện tại cần giải quyết).

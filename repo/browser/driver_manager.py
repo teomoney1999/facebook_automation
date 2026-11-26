@@ -235,9 +235,10 @@ def free_port(port: int, force: bool = True) -> bool:
         return False
 
 
-def build_chrome_options(config: BotConfig) -> Options:
+def build_chrome_options(config: BotConfig, headless: Optional[bool] = None) -> Options:
     """
-    Build production-grade ChromeOptions with anti-bot stealth flags and session persistence.
+    Build production-grade ChromeOptions with anti-bot stealth flags, session persistence,
+    and optional headless/offscreen background execution.
     """
     options = Options()
 
@@ -258,6 +259,23 @@ def build_chrome_options(config: BotConfig) -> Options:
     options.add_argument("--disable-notifications")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+
+    # Headless / Silent Browser Execution
+    is_headless = headless if headless is not None else getattr(config, "headless", False)
+    mode = getattr(config, "headless_mode", "new").lower()
+
+    if is_headless:
+        if mode == "offscreen":
+            # Ghost Offscreen mode: window positioned off the virtual desktop grid
+            options.add_argument("--window-position=-32000,-32000")
+            options.add_argument("--window-size=1920,1080")
+            logger.info("Chrome configured in Ghost Offscreen mode (window-position=-32000,-32000).")
+        else:
+            # Modern Chrome Headless (Chrome 109+) with full desktop viewport
+            options.add_argument("--headless=new")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-gpu")
+            logger.info("Chrome configured in Headless New mode (--headless=new, 1920x1080).")
 
     return options
 
@@ -284,13 +302,15 @@ def apply_stealth_cdp(driver: webdriver.Chrome) -> None:
 
 
 @contextmanager
-def get_driver(config: BotConfig) -> Generator[webdriver.Chrome, None, None]:
+def get_driver(
+    config: BotConfig, headless: Optional[bool] = None
+) -> Generator[webdriver.Chrome, None, None]:
     """
     Context Manager for Chrome WebDriver Lifecycle.
     
     Guarantees:
     1. Pre-flight sanitation: frees debugging port and clears stale SingletonLock files.
-    2. Secure initialization: attaches stealth options and CDP script.
+    2. Secure initialization: attaches stealth options, headless settings, and CDP script.
     3. Finish What You Start: ensures driver.quit() and post-flight cleanup
        occur even if exceptions occur during bot execution.
     """
@@ -298,11 +318,14 @@ def get_driver(config: BotConfig) -> Generator[webdriver.Chrome, None, None]:
     free_port(config.debug_port)
     clean_chrome_locks(config.profile_dir)
 
-    options = build_chrome_options(config)
+    options = build_chrome_options(config, headless=headless)
     driver: Optional[webdriver.Chrome] = None
 
+    is_headless = headless if headless is not None else getattr(config, "headless", False)
+    mode_str = f"headless={is_headless}" + (f", mode={getattr(config, 'headless_mode', 'new')}" if is_headless else "")
+
     try:
-        logger.info(f"Launching Chrome with profile at {config.profile_dir} on port {config.debug_port}...")
+        logger.info(f"Launching Chrome ({mode_str}) with profile at {config.profile_dir} on port {config.debug_port}...")
         driver = webdriver.Chrome(options=options)
         apply_stealth_cdp(driver)
         logger.info("Chrome driver initialized successfully.")

@@ -7,6 +7,7 @@ and dynamic runtime batch limits.
 """
 
 import argparse
+import dataclasses
 import logging
 import os
 from pathlib import Path
@@ -23,6 +24,7 @@ from helpers.logger import setup_logger
 from facebookbot import FacebookBot
 from browser.dom_inspector import DOMInspector
 from browser.driver_manager import get_driver
+from services.selector_sync import sync_selectors
 from services.state_manager import StateManager
 
 
@@ -163,6 +165,24 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Đường dẫn đến một hoặc nhiều file ảnh đính kèm (mặc định tự động quét repo/images/).",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        default=False,
+        help="Chạy Chrome ở chế độ ẩn hoàn toàn (không mở cửa sổ trên màn hình).",
+    )
+    parser.add_argument(
+        "--no-headless",
+        action="store_true",
+        default=False,
+        help="Bắt buộc mở cửa sổ Chrome (ghi đè HEADLESS=true trong .env).",
+    )
+    parser.add_argument(
+        "--headless-mode",
+        choices=["new", "offscreen"],
+        default=None,
+        help="Chế độ ẩn trình duyệt: 'new' (tiết kiệm RAM) hoặc 'offscreen' (Ghost mode an toàn tuyệt đối).",
+    )
     return parser.parse_args()
 
 
@@ -172,6 +192,10 @@ def run_dom_check(config: BotConfig, logger: logging.Logger, stop_event: Optiona
         logger.warning("🛑 Dừng kiểm tra DOM theo yêu cầu (Stop Requested).")
         return 1
     logger.info("🔍 Bắt đầu kiểm tra sức khỏe DOM Facebook (DOM Canary Check)...")
+    selectors_url = os.environ.get("SELECTORS_REMOTE_URL", "").strip()
+    if selectors_url:
+        sync_selectors(selectors_url, config.json_dir / "selectors.json", custom_logger=logger)
+
     selectors_file = str(config.json_dir / "selectors.json")
 
     with get_driver(config) as driver:
@@ -271,7 +295,25 @@ def main() -> int:
         print(f"❌ Lỗi nạp cấu hình .env: {err}", file=sys.stderr)
         return 1
 
+    # Apply CLI headless overrides
+    replace_kwargs = {}
+    if getattr(args, "no_headless", False) is True:
+        replace_kwargs["headless"] = False
+    elif getattr(args, "headless", False) is True:
+        replace_kwargs["headless"] = True
+
+    if getattr(args, "headless_mode", None) in ("new", "offscreen"):
+        replace_kwargs["headless_mode"] = args.headless_mode
+
+    if replace_kwargs:
+        if dataclasses.is_dataclass(config):
+            config = dataclasses.replace(config, **replace_kwargs)
+        else:
+            for k, v in replace_kwargs.items():
+                setattr(config, k, v)
+
     logger = setup_logger("FacebookBot", str(config.logs_dir / "bot.log"))
+    logger.info("Cấu hình phiên chạy CLI: Headless=%s (mode=%s)", config.headless, config.headless_mode)
 
     if args.status:
         return show_status(config, logger)
@@ -283,7 +325,7 @@ def main() -> int:
         return run_check_membership(config, logger, target_url=args.url)
 
     if getattr(args, "join_groups", False) is True:
-        lock = ProcessLock(config.base_dir / "bot.lock")
+        lock = ProcessLock(config.data_dir / "bot.lock")
         if not lock.acquire():
             logger.critical("❌ Một tiến trình bot khác đang chạy. Không thể chạy đồng thời.")
             return 1
@@ -321,7 +363,7 @@ def main() -> int:
         print("✅ Đã đăng xuất Facebook thành công (Session Chrome đã được dọn sạch).")
         return 0
 
-    lock = ProcessLock(config.base_dir / "bot.lock")
+    lock = ProcessLock(config.data_dir / "bot.lock")
     if not lock.acquire():
         logger.critical("❌ Một tiến trình bot khác đang chạy. Không thể chạy đồng thời.")
         return 1

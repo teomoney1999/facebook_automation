@@ -105,19 +105,30 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_ADMIN_ID=
 ```
 
-### 3. Tạo dữ liệu nhóm và bài viết (`repo/json/`)
+### 3. Dữ liệu nhóm và bài viết (`repo/json/`)
 
-Để bảo vệ dữ liệu riêng tư, `repo/json/links.json` và `repo/json/posts.json` được loại trừ khỏi Git. Sau khi clone, hãy tạo 2 file này trong `repo/json/`:
+Để bảo vệ dữ liệu riêng tư, `repo/json/links.json` và `repo/json/posts.json` được loại trừ khỏi Git. 
+
+> **💡 Zero-Config**: Bạn **không cần phải tạo file thủ công**! 
+> - Khi mở ứng dụng lần đầu, hệ thống tự động khởi tạo cấu trúc dữ liệu rỗng chuẩn contract.
+> - Trên Desktop GUI (Tab *Nội dung & Nhóm mục tiêu*), bạn chỉ cần dán link nhóm vào phần **➕ Thêm Nhóm...** (hoặc nhấn `Ctrl+V` / `Cmd+V` trên bảng nhóm), code sẽ tự động lọc sạch canonical URL và lưu vào `links.json`.
+> - Nếu muốn chuẩn bị file mẫu thủ công trước, cấu trúc schema như sau:
 
 **`repo/json/links.json`** (danh sách nhóm mục tiêu):
 ```json
 {
   "groups": [
     {
-      "url": "https://www.facebook.com/groups/example_group/",
+      "url": "https://www.facebook.com/groups/example_group",
       "name": "Example Group",
-      "membership": "ALREADY_JOINED"
+      "members": "—",
+      "privacy": "—",
+      "membership": "ALREADY_JOINED",
+      "updated_at": null
     }
+  ],
+  "target_links": [
+    "https://www.facebook.com/groups/example_group"
   ]
 }
 ```

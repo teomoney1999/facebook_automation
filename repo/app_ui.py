@@ -18,6 +18,7 @@ from pathlib import Path
 import queue
 import re
 import sys
+import tempfile
 import threading
 import time
 import webbrowser
@@ -33,15 +34,16 @@ except (ImportError, ModuleNotFoundError):
     ttk = None
     ScrolledText = None
     TKINTER_AVAILABLE = False
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure repo directory is in sys.path
 REPO_DIR = Path(__file__).resolve().parent
 if str(REPO_DIR) not in sys.path:
     sys.path.insert(0, str(REPO_DIR))
 
-from config import BotConfig, ConfigurationError, get_config
+from config import BotConfig, ConfigurationError, get_config, get_default_env_path
 from helpers.common_helpers import (
+    ensure_group_targets_file,
     extract_facebook_group_urls,
     format_duration,
     load_from_file,
@@ -52,6 +54,7 @@ from helpers.common_helpers import (
 from helpers.logger import setup_logger
 from facebookbot import FacebookBot
 from browser.driver_manager import get_driver
+from services.job_dispatcher import JobDispatcher, JobItem, JobStatus
 from services.state_manager import StateManager
 from services.telegram_controller import TelegramController
 from services.posting_plan import (
@@ -101,6 +104,7 @@ class BotWorkerThread(threading.Thread):
         posting_tasks: Optional[Any] = None,
         join_delay_min: Optional[float] = None,
         join_delay_max: Optional[float] = None,
+        headless: Optional[bool] = None,
     ):
         super().__init__(name="BotWorkerThread", daemon=True)
         self.config = config
@@ -114,6 +118,7 @@ class BotWorkerThread(threading.Thread):
         self.posting_tasks = posting_tasks
         self.join_delay_min = join_delay_min
         self.join_delay_max = join_delay_max
+        self.headless = headless
         self.stop_event = stop_event or threading.Event()
         self.event_callback = event_callback
         self.completion_callback = completion_callback
@@ -126,20 +131,26 @@ class BotWorkerThread(threading.Thread):
         self.start_time = time.time()
         self.logger.info("⚡ Worker Thread bắt đầu thực thi tác vụ...")
         results = []
+        import dataclasses
+        effective_config = (
+            dataclasses.replace(self.config, headless=self.headless)
+            if (self.headless is not None and dataclasses.is_dataclass(self.config))
+            else self.config
+        )
         try:
             if self.check_dom:
                 from main import run_dom_check
-                code = run_dom_check(self.config, self.logger, stop_event=self.stop_event)
+                code = run_dom_check(effective_config, self.logger, stop_event=self.stop_event)
                 results = [{"status": "CHECK_DOM", "details": f"Exit code: {code}"}]
             elif self.join_mode:
                 bot = FacebookBot(
-                    config=self.config,
+                    config=effective_config,
                     target_links=self.target_links,
                     custom_logger=self.logger,
                 )
-                effective_min = self.join_delay_min if self.join_delay_min is not None else getattr(self.config, "join_delay_min", 15.0)
-                effective_max = self.join_delay_max if self.join_delay_max is not None else getattr(self.config, "join_delay_max", 35.0)
-                effective_limit = self.custom_batch_size or getattr(self.config, "join_limit", 10)
+                effective_min = self.join_delay_min if self.join_delay_min is not None else getattr(effective_config, "join_delay_min", 15.0)
+                effective_max = self.join_delay_max if self.join_delay_max is not None else getattr(effective_config, "join_delay_max", 35.0)
+                effective_limit = self.custom_batch_size or getattr(effective_config, "join_limit", 10)
                 results = bot.join_groups(
                     target_links=self.target_links,
                     dry_run=self.dry_run,
@@ -151,7 +162,7 @@ class BotWorkerThread(threading.Thread):
                 )
             else:
                 bot = FacebookBot(
-                    config=self.config,
+                    config=effective_config,
                     target_links=self.target_links,
                     images=self.images,
                     custom_logger=self.logger,
@@ -176,6 +187,160 @@ class BotWorkerThread(threading.Thread):
                 self.completion_callback(results)
 
 
+class UpdateDialog(tk.Toplevel if tk else object):
+    """Modal dialog displaying new version release notes and download progress."""
+
+    def __init__(self, parent, update_info, logger=None):
+        if not TKINTER_AVAILABLE:
+            return
+        super().__init__(parent)
+        self.title("🚀 Cập Nhật Ứng Dụng Mới")
+        self.geometry("520x400")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        self.update_info = update_info
+        self.logger = logger
+        self.is_downloading = False
+
+        self._build_ui()
+
+    def _build_ui(self):
+        container = ttk.Frame(self, padding=16)
+        container.pack(fill="both", expand=True)
+
+        title_lbl = ttk.Label(
+            container,
+            text=f"✨ Đã có phiên bản mới: v{self.update_info.version}",
+            font=("Arial", 13, "bold"),
+            foreground="#0b6623",
+        )
+        title_lbl.pack(anchor="w", pady=(0, 4))
+
+        if self.update_info.release_date:
+            date_lbl = ttk.Label(
+                container,
+                text=f"Ngày phát hành: {self.update_info.release_date}",
+                font=("Arial", 9, "italic"),
+                foreground="gray",
+            )
+            date_lbl.pack(anchor="w", pady=(0, 10))
+
+        # Changelog frame
+        lbl_changelog = ttk.Label(container, text="Các tính năng mới & cải tiến:", font=("Arial", 10, "bold"))
+        lbl_changelog.pack(anchor="w", pady=(4, 4))
+
+        txt_frame = ttk.Frame(container)
+        txt_frame.pack(fill="both", expand=True, pady=(0, 10))
+        changelog_text = ScrolledText(txt_frame, height=7, wrap="word", font=("Arial", 10))
+        changelog_text.pack(fill="both", expand=True)
+
+        if self.update_info.changelog:
+            for item in self.update_info.changelog:
+                changelog_text.insert("end", f"• {item}\n")
+        else:
+            changelog_text.insert("end", "• Bản cập nhật cải thiện độ ổn định và sửa lỗi.\n")
+        changelog_text.config(state="disabled")
+
+        # Progress frame (hidden by default)
+        self.prog_frame = ttk.Frame(container)
+        self.progress_bar = ttk.Progressbar(self.prog_frame, mode="determinate")
+        self.progress_bar.pack(fill="x", expand=True, side="left", padx=(0, 8))
+        self.progress_lbl = ttk.Label(self.prog_frame, text="0%", font=("Arial", 9))
+        self.progress_lbl.pack(side="right")
+
+        # Buttons
+        self.btn_frame = ttk.Frame(container)
+        self.btn_frame.pack(fill="x", pady=(10, 0))
+
+        self.btn_update = ttk.Button(
+            self.btn_frame,
+            text="⚡ Cập Nhật Ngay",
+            style="Action.TButton",
+            command=self._start_download,
+        )
+        self.btn_update.pack(side="right", padx=(8, 0))
+
+        self.btn_close = ttk.Button(
+            self.btn_frame,
+            text="Để sau",
+            command=self.destroy,
+        )
+        self.btn_close.pack(side="right")
+
+    def _start_download(self):
+        if self.is_downloading:
+            return
+        self.is_downloading = True
+        self.btn_update.config(state="disabled")
+        self.btn_close.config(state="disabled")
+        self.prog_frame.pack(fill="x", pady=(4, 10))
+
+        def _worker():
+            dest_dir = Path(tempfile.gettempdir()) / "FacebookBotUpdates"
+            dest_file = dest_dir / f"FacebookBotSetup-v{self.update_info.version}.exe"
+
+            def _on_progress(downloaded, total):
+                if total > 0:
+                    pct = int((downloaded / total) * 100)
+                    self.after(0, lambda: self._update_progress_ui(pct, downloaded, total))
+
+            from services.updater import download_update
+
+            success = download_update(
+                download_url=self.update_info.download_url,
+                dest_path=dest_file,
+                expected_sha256=self.update_info.sha256 or None,
+                progress_callback=_on_progress,
+                custom_logger=self.logger,
+            )
+
+            if success:
+                self.after(0, lambda: self._on_download_complete(dest_file))
+            else:
+                self.after(0, self._on_download_failed)
+
+        threading.Thread(target=_worker, daemon=True, name="UpdateDownloadWorker").start()
+
+    def _update_progress_ui(self, pct, downloaded, total):
+        try:
+            self.progress_bar["value"] = pct
+            mb_down = downloaded / (1024 * 1024)
+            mb_tot = total / (1024 * 1024)
+            self.progress_lbl.config(text=f"{pct}% ({mb_down:.1f}/{mb_tot:.1f} MB)")
+        except Exception:
+            pass
+
+    def _on_download_complete(self, installer_path):
+        try:
+            self.progress_lbl.config(text="100% - Đang khởi chạy nâng cấp...")
+            messagebox.showinfo(
+                "Khởi Chạy Cập Nhật",
+                "Đã tải xong bộ cài mới. Ứng dụng sẽ tự động đóng và nâng cấp ngầm trong 5 giây.",
+                parent=self,
+            )
+            from services.updater import launch_silent_installer
+            launch_silent_installer(installer_path, exit_current=True, custom_logger=self.logger)
+        except Exception as err:
+            if self.logger:
+                self.logger.error("Lỗi khi mở bộ cài đặt: %s", err)
+            self._on_download_failed()
+
+    def _on_download_failed(self):
+        try:
+            self.is_downloading = False
+            self.btn_update.config(state="normal")
+            self.btn_close.config(state="normal")
+            messagebox.showerror(
+                "Lỗi Cập Nhật",
+                "Tải bộ cài đặt thất bại hoặc sai mã kiểm tra SHA-256. Vui lòng thử lại sau.",
+                parent=self,
+            )
+        except Exception:
+            pass
+
+
 class FacebookBotGUI(tk.Tk if tk else object):
     """Enterprise Desktop GUI for Facebook Automation Bot."""
 
@@ -188,7 +353,7 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self.minsize(880, 620)
 
         self.repo_dir = REPO_DIR
-        self.env_file = Path(config_path).resolve() if config_path else (self.repo_dir / ".env")
+        self.env_file = Path(config_path).resolve() if config_path else get_default_env_path(base_dir=self.repo_dir)
 
         # Threading & Control constructs
         self.log_queue: queue.Queue = queue.Queue()
@@ -196,7 +361,9 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self.worker_thread: Optional[BotWorkerThread] = None
 
         # Setup Logging with QueueHandler
-        self.logger = setup_logger("FacebookBotGUI", str(self.repo_dir / "logs" / "bot.log"))
+        log_dir = self.env_file.parent / "logs" if self.env_file.parent != self.repo_dir else (self.repo_dir / "logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        self.logger = setup_logger("FacebookBotGUI", str(log_dir / "bot.log"))
         self.queue_handler = QueueLogHandler(self.log_queue)
         self.queue_handler.setFormatter(
             logging.Formatter("[%(asctime)s] [%(levelname)-8s] %(message)s", datefmt="%H:%M:%S")
@@ -213,6 +380,12 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self.groups_meta_file = self.config.json_dir / "groups_meta.json"
         self.posts: List[PostItem] = []
         self.active_draft_idx: int = 0
+        self.tray_icon = None
+        self.var_headless = tk.BooleanVar(value=getattr(self.config, "headless", False))
+
+        # Initialize Multi-Task Job Dispatcher (Task Manager Engine)
+        self.dispatcher = JobDispatcher(logger=self.logger)
+        self.dispatcher.add_listener(lambda job: self.after(0, self._on_dispatcher_job_update, job))
 
         # Initialize Telegram Controller
         self.telegram = TelegramController(
@@ -230,11 +403,33 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self._setup_styles()
         self._create_widgets()
 
-        # Bind Window Close Event
+        # Bind Window Close Event and macOS Dock click
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
+        try:
+            self.createcommand("::tk::mac::ReopenApplication", self._restore_from_background)
+        except Exception:
+            pass
 
-        # Start Log Polling Loop
+        # Start Log Polling Loop, Selector Hot-Patch and Binary Update Check
         self.after(100, self._process_log_queue)
+        self.after(3000, self._check_hotpatch_selectors)
+        self.after(5000, lambda: self._on_check_update_clicked(silent=True))
+
+    def _check_hotpatch_selectors(self):
+        """Asynchronously syncs DOM selectors from cloud if SELECTORS_REMOTE_URL is set."""
+        def _worker():
+            url = os.environ.get("SELECTORS_REMOTE_URL", "").strip()
+            if not url:
+                return
+            try:
+                from services.selector_sync import sync_selectors
+                sel_path = self.config.json_dir / "selectors.json"
+                if sync_selectors(url, sel_path, custom_logger=self.logger):
+                    self.logger.info("⚡ Giao diện đã tự động cập nhật bộ chọn Facebook DOM mới nhất từ cloud.")
+            except Exception as err:
+                self.logger.debug("Lỗi khi kiểm tra hot-patch selectors: %s", err)
+
+        threading.Thread(target=_worker, daemon=True, name="SelectorSyncWorker").start()
 
     def _setup_styles(self):
         """Configures ttk styles for clean visual appearance."""
@@ -263,9 +458,26 @@ class FacebookBotGUI(tk.Tk if tk else object):
             )
 
     def _create_widgets(self):
-        """Constructs tabbed interface."""
+        """Constructs tabbed interface and bottom status footer."""
+        # Bottom footer bar with version and update check
+        self.footer_frame = ttk.Frame(self, padding=(10, 4))
+        self.footer_frame.pack(side="bottom", fill="x")
+
+        ver_text = f"Facebook Automation Bot v{getattr(self.config, 'app_version', '2.0.0')}"
+        self.version_lbl = ttk.Label(self.footer_frame, text=ver_text, font=("Arial", 9, "bold"))
+        self.version_lbl.pack(side="left")
+
+        self.update_status_lbl = ttk.Label(self.footer_frame, text="", font=("Arial", 9, "italic"), foreground="gray")
+        self.update_status_lbl.pack(side="left", padx=15)
+
+        self.btn_check_update = ttk.Button(self.footer_frame, text="🔄 Kiểm tra cập nhật", command=self._on_check_update_clicked)
+        self.btn_check_update.pack(side="right")
+
+        self.btn_hide_bg_footer = ttk.Button(self.footer_frame, text="🕶️ ẨN XUỐNG NỀN", command=self._hide_to_background)
+        self.btn_hide_bg_footer.pack(side="right", padx=5)
+
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=(10, 4))
 
         # Tabs
         self.tab_config = ttk.Frame(self.notebook)
@@ -282,6 +494,61 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self._build_tab_history()
         self._build_tab_content()
         self._build_tab_config()
+
+    def _on_check_update_clicked(self, silent: bool = False):
+        """Checks for software updates asynchronously."""
+        update_url = getattr(self.config, "update_url", None) or os.environ.get("UPDATE_CHECK_URL", "").strip()
+        if not update_url:
+            if not silent:
+                messagebox.showinfo(
+                    "Cập Nhật Ứng Dụng",
+                    f"Bạn đang sử dụng phiên bản v{getattr(self.config, 'app_version', '2.0.0')}.\n"
+                    "Chưa cấu hình đường dẫn UPDATE_CHECK_URL trong .env.",
+                )
+            return
+
+        try:
+            self.btn_check_update.config(state="disabled")
+            self.update_status_lbl.config(text="Đang kiểm tra cập nhật...")
+        except Exception:
+            pass
+
+        def _worker():
+            try:
+                from services.updater import check_for_updates
+                info = check_for_updates(
+                    current_version=getattr(self.config, "app_version", "2.0.0"),
+                    update_url=update_url,
+                    custom_logger=self.logger,
+                )
+                self.after(0, lambda: self._handle_update_result(info, silent=silent))
+            except Exception as err:
+                self.logger.error("Lỗi kiểm tra cập nhật: %s", err)
+                self.after(0, lambda: self._handle_update_result(None, error=str(err), silent=silent))
+
+        threading.Thread(target=_worker, daemon=True, name="AppUpdateCheckWorker").start()
+
+    def _handle_update_result(self, update_info, error=None, silent=False):
+        try:
+            self.btn_check_update.config(state="normal")
+            self.update_status_lbl.config(text="")
+        except Exception:
+            pass
+
+        if error:
+            if not silent:
+                messagebox.showwarning("Kiểm Tra Cập Nhật", f"Không thể kiểm tra cập nhật lúc này: {error}")
+            return
+
+        if update_info:
+            self.logger.info("Phát hiện bản cập nhật mới v%s!", update_info.version)
+            UpdateDialog(self, update_info, logger=self.logger)
+        else:
+            if not silent:
+                messagebox.showinfo(
+                    "Phiên Bản Mới Nhất",
+                    f"Bạn đang ở phiên bản mới nhất (v{getattr(self.config, 'app_version', '2.0.0')}).",
+                )
 
     # =========================================================================
     # TAB 1: CẤU HÌNH .ENV
@@ -783,6 +1050,8 @@ class FacebookBotGUI(tk.Tk if tk else object):
         # Keyboard & mouse shortcuts
         self.tree_groups.bind("<Delete>", lambda e: self._remove_selected_group())
         self.tree_groups.bind("<BackSpace>", lambda e: self._remove_selected_group())
+        self.tree_groups.bind("<Control-v>", lambda e: self._paste_groups_from_clipboard())
+        self.tree_groups.bind("<Command-v>", lambda e: self._paste_groups_from_clipboard())
         self.tree_groups.bind("<Double-1>", self._on_group_row_double_click)
         self.tree_groups.bind("<Button-1>", self._on_group_tree_press)
         self.tree_groups.bind("<B1-Motion>", self._on_group_tree_drag)
@@ -946,7 +1215,8 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
     def _load_groups_and_posts(self):
         """Loads links.json and posts.json into the UI."""
-        # 1. Load groups
+        # 1. Load groups (Ensure file exists with valid contract schema if missing)
+        ensure_group_targets_file(str(self.links_file))
         self.tree_groups.delete(*self.tree_groups.get_children())
         state_mgr = StateManager(str(self.history_file))
 
@@ -1213,10 +1483,6 @@ class FacebookBotGUI(tk.Tk if tk else object):
         Coordinates the flow to verify and join Facebook groups.
         If a group is already joined, it skips; if not, it executes the join group flow.
         """
-        if self.worker_thread and self.worker_thread.is_alive():
-            messagebox.showwarning("Đang Chạy", "Bot đang thực thi một phiên khác. Vui lòng đợi hoặc bấm Dừng.")
-            return
-
         selected_items = self.tree_groups.selection()
         target_items = selected_items if selected_items else self.tree_groups.get_children()
 
@@ -1287,10 +1553,6 @@ class FacebookBotGUI(tk.Tk if tk else object):
         Initiates posting workflow specifically for the group(s) selected in the treeview.
         Checks cooldown and asks user confirmation before overriding cooldown if needed.
         """
-        if self.worker_thread and self.worker_thread.is_alive():
-            messagebox.showwarning("Đang Chạy", "Bot đang thực thi một phiên khác. Vui lòng đợi hoặc bấm Dừng.")
-            return
-
         selected_items = self.tree_groups.selection()
         if not selected_items:
             messagebox.showinfo("Thông Báo", "Vui lòng chọn ít nhất một nhóm trong danh sách để đăng bài.")
@@ -1313,8 +1575,15 @@ class FacebookBotGUI(tk.Tk if tk else object):
         if cd_groups:
             msg = f"Có {len(cd_groups)}/{len(target_urls)} nhóm đang trong thời gian giãn cách Cooldown ({self.config.cooldown_hours}h):\n"
             for u, t in cd_groups[:3]:
-                t_str = t.strftime("%H:%M %d/%m") if t else "gần đây"
-                msg += f"• {u} (đã đăng lúc {t_str})\n"
+                if isinstance(t, (int, float)):
+                    rem_m = int(t // 60)
+                    rem_h = rem_m // 60
+                    t_str = f"còn lại {rem_h}h {rem_m % 60}p" if rem_h > 0 else f"còn lại {rem_m} phút"
+                elif hasattr(t, "strftime"):
+                    t_str = t.strftime("%H:%M %d/%m")
+                else:
+                    t_str = str(t) if t else "gần đây"
+                msg += f"• {u} ({t_str})\n"
             if len(cd_groups) > 3:
                 msg += f"... và {len(cd_groups) - 3} nhóm khác.\n"
             msg += "\nBạn có muốn bỏ qua Cooldown và tiếp tục đăng bài vào nhóm này không?"
@@ -1394,6 +1663,9 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
         ttk.Button(btn_row, text="➕ Thêm Vào Danh Sách", style="Action.TButton", command=do_add).pack(side="right")
         ttk.Button(btn_row, text="Hủy", command=dialog.destroy).pack(side="right", padx=5)
+
+        txt.bind("<Control-Return>", lambda e: do_add())
+        txt.bind("<Command-Return>", lambda e: do_add())
 
     def _remove_selected_group(self):
         """Removes highlighted group(s) from Treeview and auto-syncs links.json."""
@@ -1773,37 +2045,63 @@ class FacebookBotGUI(tk.Tk if tk else object):
         self.card_cooldown.pack(side="left", fill="both", expand=True, padx=4)
         self.card_circuit.pack(side="left", fill="both", expand=True, padx=4)
 
-        # 2. Controls & Actions Row
+        # 2. Controls & Actions Rows
         ctrl_frame = ttk.Frame(dash, padding=5)
         ctrl_frame.pack(fill="x", pady=(0, 10))
 
-        self.btn_start = ttk.Button(ctrl_frame, text="▶️ BẮT ĐẦU CHẠY", style="Action.TButton", command=self._start_bot_flow)
+        # Row 1: Primary Execution Controls
+        ctrl_row1 = ttk.Frame(ctrl_frame)
+        ctrl_row1.pack(fill="x", pady=(0, 5))
+
+        self.btn_start = ttk.Button(ctrl_row1, text="▶️ BẮT ĐẦU CHẠY", style="Action.TButton", command=self._start_bot_flow)
         self.btn_start.pack(side="left", padx=5)
 
-        self.btn_login = ttk.Button(ctrl_frame, text="🔑 ĐĂNG NHẬP FACEBOOK", command=self._start_login_flow)
-        self.btn_login.pack(side="left", padx=5)
-
-        self.btn_logout = ttk.Button(ctrl_frame, text="🚪 ĐĂNG XUẤT", command=self._start_logout_flow)
-        self.btn_logout.pack(side="left", padx=5)
-
-        self.btn_dryrun = ttk.Button(ctrl_frame, text="🔍 CHẠY THỬ (DRY-RUN)", command=self._start_dry_run_flow)
+        self.btn_dryrun = ttk.Button(ctrl_row1, text="🔍 CHẠY THỬ (DRY-RUN)", command=self._start_dry_run_flow)
         self.btn_dryrun.pack(side="left", padx=5)
 
-        self.btn_canary = ttk.Button(ctrl_frame, text="🩺 KIỂM TRA DOM", command=self._start_dom_check_flow)
+        self.btn_canary = ttk.Button(ctrl_row1, text="🩺 KIỂM TRA DOM", command=self._start_dom_check_flow)
         self.btn_canary.pack(side="left", padx=5)
 
-        self.btn_stop = ttk.Button(ctrl_frame, text="🛑 DỪNG KHẨN CẤP", style="Danger.TButton", state="disabled", command=self._stop_bot_flow)
+        self.btn_stop = ttk.Button(ctrl_row1, text="🛑 DỪNG KHẨN CẤP", style="Danger.TButton", state="disabled", command=self._stop_bot_flow)
         self.btn_stop.pack(side="right", padx=5)
 
+        self.btn_hide_bg = ttk.Button(ctrl_row1, text="🕶️ ẨN XUỐNG NỀN", command=self._hide_to_background)
+        self.btn_hide_bg.pack(side="right", padx=5)
+
+        # Row 2: Account & Settings Controls
+        ctrl_row2 = ttk.Frame(ctrl_frame)
+        ctrl_row2.pack(fill="x")
+
+        self.btn_login = ttk.Button(ctrl_row2, text="🔑 ĐĂNG NHẬP FACEBOOK", command=self._start_login_flow)
+        self.btn_login.pack(side="left", padx=5)
+
+        self.btn_logout = ttk.Button(ctrl_row2, text="🚪 ĐĂNG XUẤT", command=self._start_logout_flow)
+        self.btn_logout.pack(side="left", padx=5)
+
         # Batch override spinbox
-        ttk.Label(ctrl_frame, text="Batch Limit:").pack(side="left", padx=(15, 2))
-        self.spn_batch = ttk.Spinbox(ctrl_frame, from_=1, to=100, width=5)
+        ttk.Label(ctrl_row2, text="Batch Limit:").pack(side="left", padx=(15, 2))
+        self.spn_batch = ttk.Spinbox(ctrl_row2, from_=1, to=100, width=5)
         self.spn_batch.set(self.config.max_posts_per_run)
         self.spn_batch.pack(side="left")
+
+        # Headless mode toggle
+        self.chk_headless = ttk.Checkbutton(
+            ctrl_row2,
+            text="Ẩn Chrome",
+            variable=self.var_headless,
+        )
+        self.chk_headless.pack(side="left", padx=(10, 5))
 
         # 3. Progress Bar
         self.progress_bar = ttk.Progressbar(dash, orient="horizontal", mode="determinate")
         self.progress_bar.pack(fill="x", pady=(0, 10))
+
+        # 3.5. Task Manager Bar / Panel (Quản lý các công việc đang chạy song song/hàng đợi)
+        self.task_manager_frame = ttk.LabelFrame(
+            dash, text="⚡ BẢNG QUẢN LÝ CÔNG VIỆC (TASK MANAGER)", padding=(10, 6)
+        )
+        self.task_manager_frame.pack(fill="x", pady=(0, 10))
+        self._setup_task_manager_panel(self.task_manager_frame)
 
         # 4. Live Console Frame
         console_hdr = ttk.Frame(dash)
@@ -1817,7 +2115,7 @@ class FacebookBotGUI(tk.Tk if tk else object):
             fg="#d4d4d4",
             insertbackground="white",
             font=("Menlo", 9) if sys.platform == "darwin" else ("Consolas", 9),
-            height=18,
+            height=14,
             wrap="word",
         )
         self.console_text.pack(fill="both", expand=True, pady=(5, 0))
@@ -1855,6 +2153,119 @@ class FacebookBotGUI(tk.Tk if tk else object):
         """Clears text area."""
         self.console_text.delete("1.0", tk.END)
 
+    def _setup_task_manager_panel(self, parent: ttk.LabelFrame):
+        """Builds the Task Manager bar displaying active/queued jobs with individual cancel buttons."""
+        top_row = ttk.Frame(parent)
+        top_row.pack(fill="x", pady=(0, 4))
+
+        self.lbl_tm_summary = ttk.Label(
+            top_row, text="Chưa có tác vụ nào trong hàng đợi.", font=("Arial", 9, "bold")
+        )
+        self.lbl_tm_summary.pack(side="left")
+
+        ttk.Button(
+            top_row, text="🧹 Dọn Dẹp Đã Xong", command=self._clear_finished_dispatcher_jobs
+        ).pack(side="right", padx=(5, 0))
+
+        ttk.Button(
+            top_row, text="🛑 Dừng Tất Cả", style="Danger.TButton", command=self._stop_bot_flow
+        ).pack(side="right")
+
+        # Container for job cards
+        self.tm_items_container = ttk.Frame(parent)
+        self.tm_items_container.pack(fill="x", expand=True)
+
+        self._refresh_task_manager_ui()
+
+    def _clear_finished_dispatcher_jobs(self):
+        """Cleans up completed/cancelled/failed jobs from dispatcher and refreshes UI."""
+        if hasattr(self, "dispatcher"):
+            self.dispatcher.clear_completed()
+            self._refresh_task_manager_ui()
+
+    def _on_dispatcher_job_update(self, job: JobItem):
+        """Callback invoked whenever any job in dispatcher updates its state."""
+        self._refresh_task_manager_ui()
+
+    def _refresh_task_manager_ui(self):
+        """Renders live job items in the Task Manager Panel."""
+        if not hasattr(self, "tm_items_container") or not self.tm_items_container.winfo_exists():
+            return
+
+        for child in self.tm_items_container.winfo_children():
+            child.destroy()
+
+        jobs = self.dispatcher.get_jobs() if hasattr(self, "dispatcher") else []
+        running_cnt = sum(1 for j in jobs if j.status == JobStatus.RUNNING)
+        queued_cnt = sum(1 for j in jobs if j.status == JobStatus.QUEUED)
+        done_cnt = sum(1 for j in jobs if j.status in (JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED))
+
+        if not jobs:
+            self.lbl_tm_summary.config(text="Chưa có tác vụ nào trong hàng đợi.")
+            empty_lbl = ttk.Label(
+                self.tm_items_container,
+                text="ℹ️ Bạn có thể bấm 'BẮT ĐẦU CHẠY', 'CHẠY THỬ' hoặc 'THAM GIA NHÓM' để thêm tác vụ chạy song song.",
+                foreground="#888888",
+            )
+            empty_lbl.pack(anchor="w", pady=4)
+            return
+
+        self.lbl_tm_summary.config(
+            text=f"Đang chạy: {running_cnt} | Hàng đợi: {queued_cnt} | Đã hoàn tất: {done_cnt}"
+        )
+
+        for job in jobs[-5:]:
+            row = ttk.Frame(self.tm_items_container)
+            row.pack(fill="x", pady=2)
+
+            status_color = "#4ec9b0"
+            if job.status == JobStatus.RUNNING:
+                status_text = "[ĐANG CHẠY]"
+                status_color = "#32a852"
+            elif job.status == JobStatus.QUEUED:
+                status_text = "[HÀNG ĐỢI]"
+                status_color = "#e6a100"
+            elif job.status == JobStatus.COMPLETED:
+                status_text = "[HOÀN TẤT]"
+                status_color = "#1877f2"
+            elif job.status == JobStatus.CANCELLED:
+                status_text = "[ĐÃ HỦY]"
+                status_color = "#888888"
+            else:
+                status_text = "[LỖI]"
+                status_color = "#d9534f"
+
+            lbl_st = tk.Label(row, text=status_text, fg=status_color, font=("Arial", 9, "bold"), width=12, anchor="w")
+            lbl_st.pack(side="left")
+
+            lbl_nm = ttk.Label(row, text=f"{job.name} ({job.current_step}/{job.total_steps})", font=("Arial", 9, "bold"), width=28)
+            lbl_nm.pack(side="left", padx=5)
+
+            pbar = ttk.Progressbar(row, orient="horizontal", mode="determinate", length=130)
+            pbar["value"] = job.progress
+            pbar.pack(side="left", padx=5)
+
+            lbl_pct = ttk.Label(row, text=f"{int(job.progress)}%", width=5)
+            lbl_pct.pack(side="left")
+
+            details_str = job.details
+            if len(details_str) > 35:
+                details_str = details_str[:32] + "..."
+            lbl_det = ttk.Label(row, text=details_str, foreground="#666666", width=30)
+            lbl_det.pack(side="left", padx=5)
+
+            if job.status in (JobStatus.RUNNING, JobStatus.QUEUED):
+                btn_cancel = ttk.Button(
+                    row,
+                    text="🛑 Dừng",
+                    width=7,
+                    command=lambda jid=job.job_id: self.dispatcher.cancel_job(jid),
+                )
+                btn_cancel.pack(side="right", padx=2)
+            else:
+                lbl_dur = ttk.Label(row, text=job.duration_str, foreground="#888888")
+                lbl_dur.pack(side="right", padx=4)
+
     def _process_log_queue(self):
         """Pulls log items from queue and writes them to ScrolledText with formatting."""
         while not self.log_queue.empty():
@@ -1889,8 +2300,11 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
     def _start_login_flow(self):
         """Launches interactive login in a worker thread to authenticate Facebook."""
-        if self.worker_thread and self.worker_thread.is_alive():
-            messagebox.showwarning("Đang Chạy", "Bot đang thực thi một phiên khác. Vui lòng đợi hoặc bấm Dừng.")
+        is_busy = (self.worker_thread and self.worker_thread.is_alive()) or (
+            hasattr(self, "dispatcher") and self.dispatcher.is_running
+        )
+        if is_busy:
+            messagebox.showwarning("Đang Chạy", "Bot đang thực thi các tác vụ. Vui lòng đợi hoặc bấm Dừng trước khi đăng nhập.")
             return
 
         try:
@@ -1981,8 +2395,11 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
     def _start_logout_flow(self):
         """Purges Facebook session out of Chrome profile to allow switching accounts."""
-        if self.worker_thread and self.worker_thread.is_alive():
-            messagebox.showwarning("Đang Chạy", "Bot đang thực thi một phiên khác. Vui lòng đợi hoặc bấm Dừng.")
+        is_busy = (self.worker_thread and self.worker_thread.is_alive()) or (
+            hasattr(self, "dispatcher") and self.dispatcher.is_running
+        )
+        if is_busy:
+            messagebox.showwarning("Đang Chạy", "Bot đang thực thi các tác vụ. Vui lòng dừng các tác vụ trước khi đăng xuất.")
             return
 
         ans = messagebox.askyesno(
@@ -2018,11 +2435,7 @@ class FacebookBotGUI(tk.Tk if tk else object):
         join_delay_max: Optional[float] = None,
         override_cooldown: bool = False,
     ):
-        """Spawns the background worker thread."""
-        if self.worker_thread and self.worker_thread.is_alive():
-            messagebox.showwarning("Đang Chạy", "Bot đang thực thi một phiên khác. Vui lòng đợi hoặc bấm Dừng.")
-            return
-
+        """Spawns or dispatches the background worker task via JobDispatcher."""
         try:
             if hasattr(self, "cfg_entries") and "EMAIL" in self.cfg_entries and "PASSWORD" in self.cfg_entries:
                 new_email = self.cfg_entries["EMAIL"].get().strip()
@@ -2039,24 +2452,34 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
         # UI State updates
         self.stop_event.clear()
-        self.btn_start.configure(state="disabled")
         self.btn_login.configure(state="disabled")
         self.btn_logout.configure(state="disabled")
-        self.btn_dryrun.configure(state="disabled")
-        self.btn_canary.configure(state="disabled")
-        self._set_scan_buttons_state("disabled")
         self.btn_stop.configure(state="normal")
-        self.progress_bar["value"] = 0
 
         if join_mode:
             mode_str = "🤝 JOIN NHÓM"
+            job_type = "JOIN_GROUPS"
+            total_steps = len(custom_targets) if custom_targets else effective_batch
+            job_name = f"Tham gia nhóm ({total_steps} nhóm)"
         elif dry_run:
             mode_str = "🔍 DRY-RUN"
+            job_type = "DRY_RUN"
+            total_steps = effective_batch
+            job_name = f"Chạy thử Dry-run ({effective_batch} bài)"
         elif check_dom:
             mode_str = "🩺 CHECK DOM"
+            job_type = "DOM_CHECK"
+            total_steps = 1
+            job_name = "Kiểm tra cấu trúc DOM"
         else:
             mode_str = "🚀 ĐĂNG BÀI"
-        self.card_status.val_label.config(text=f"🟡 RUNNING ({mode_str})")  # type: ignore
+            job_type = "POST"
+            target_count = len(custom_targets) if custom_targets else effective_batch
+            total_steps = target_count
+            job_name = f"Đăng bài viết ({target_count} nhóm)"
+
+        if not (hasattr(self, "dispatcher") and self.dispatcher.is_running):
+            self.card_status.val_label.config(text=f"🟡 RUNNING ({mode_str})")  # type: ignore
 
         if self.telegram:
             self.telegram.set_busy(True)
@@ -2082,31 +2505,85 @@ class FacebookBotGUI(tk.Tk if tk else object):
             posting_tasks = plan.tasks
 
         import dataclasses
-        worker_config = dataclasses.replace(self.config, cooldown_hours=0) if override_cooldown else self.config
-
-        self.worker_thread = BotWorkerThread(
-            config=worker_config,
-            dry_run=dry_run,
-            custom_batch_size=effective_batch,
-            check_dom=check_dom,
-            join_mode=join_mode,
-            stop_event=self.stop_event,
-            event_callback=self._on_bot_event,
-            completion_callback=self._on_bot_completed,
-            logger=self.logger,
-            images=gui_images,
-            target_links=live_links,
-            post_content=post_content,
-            posting_tasks=posting_tasks,
-            join_delay_min=join_delay_min,
-            join_delay_max=join_delay_max,
+        headless_val = self.var_headless.get() if hasattr(self, "var_headless") else getattr(self.config, "headless", False)
+        worker_config = dataclasses.replace(
+            self.config,
+            cooldown_hours=0 if override_cooldown else self.config.cooldown_hours,
+            headless=headless_val,
         )
-        self.worker_thread.start()
+
+        def _dispatcher_task(job: JobItem):
+            self.after(0, lambda: self.card_status.val_label.config(text=f"🟡 RUNNING ({mode_str})"))  # type: ignore
+
+            def _on_event(event_type: str, data: Dict[str, Any]):
+                if event_type == "post_result":
+                    idx = data.get("index", 1)
+                    tot = data.get("total", job.total_steps or 1)
+                    target_url = data.get("link", "")
+                    job.update_progress(idx, tot, details=f"Đã xử lý: {target_url[:25]}...")
+                    if hasattr(self, "dispatcher"):
+                        self.dispatcher._notify_listeners(job)
+                self._on_bot_event(event_type, data)
+
+            def _on_completed(results: List[Dict[str, Any]]):
+                self._on_bot_completed(results)
+
+            worker = BotWorkerThread(
+                config=worker_config,
+                dry_run=dry_run,
+                custom_batch_size=effective_batch,
+                check_dom=check_dom,
+                join_mode=join_mode,
+                stop_event=job.stop_event,
+                event_callback=_on_event,
+                completion_callback=_on_completed,
+                logger=self.logger,
+                images=gui_images,
+                target_links=live_links,
+                post_content=post_content,
+                posting_tasks=posting_tasks,
+                join_delay_min=join_delay_min,
+                join_delay_max=join_delay_max,
+                headless=headless_val,
+            )
+            self.worker_thread = worker
+            worker.run()
+
+        if hasattr(self, "dispatcher"):
+            job = self.dispatcher.submit_job(
+                name=job_name,
+                job_type=job_type,
+                target_fn=_dispatcher_task,
+                total_steps=total_steps,
+            )
+            self.logger.info("📋 Đã nạp tác vụ '%s' (#%s) vào Task Manager.", job_name, job.job_id)
+        else:
+            self.worker_thread = BotWorkerThread(
+                config=worker_config,
+                dry_run=dry_run,
+                custom_batch_size=effective_batch,
+                check_dom=check_dom,
+                join_mode=join_mode,
+                stop_event=self.stop_event,
+                event_callback=self._on_bot_event,
+                completion_callback=self._on_bot_completed,
+                logger=self.logger,
+                images=gui_images,
+                target_links=live_links,
+                post_content=post_content,
+                posting_tasks=posting_tasks,
+                join_delay_min=join_delay_min,
+                join_delay_max=join_delay_max,
+                headless=headless_val,
+            )
+            self.worker_thread.start()
 
     def _stop_bot_flow(self):
-        """Signals stop request to the worker thread."""
+        """Signals stop request to the worker thread and all dispatcher tasks."""
         self.logger.warning("🛑 Người dùng nhấn DỪNG KHẨN CẤP trên Desktop GUI.")
         self.stop_event.set()
+        if hasattr(self, "dispatcher"):
+            self.dispatcher.cancel_all()
         self.btn_stop.configure(state="disabled")
         self.card_status.val_label.config(text="🛑 ĐANG DỪNG KHẨN CẤP...")  # type: ignore
 
@@ -2155,13 +2632,23 @@ class FacebookBotGUI(tk.Tk if tk else object):
 
     def _reset_ui_after_run(self, results: List[Dict[str, Any]]):
         """Restores controls and updates metrics."""
-        self.btn_start.configure(state="normal")
-        self.btn_login.configure(state="normal")
-        self.btn_logout.configure(state="normal")
-        self.btn_dryrun.configure(state="normal")
-        self.btn_canary.configure(state="normal")
-        self._set_scan_buttons_state("normal")
-        self.btn_stop.configure(state="disabled")
+        is_dispatcher_busy = hasattr(self, "dispatcher") and self.dispatcher.is_running
+        if not is_dispatcher_busy:
+            self.btn_start.configure(state="normal")
+            self.btn_login.configure(state="normal")
+            self.btn_logout.configure(state="normal")
+            self.btn_dryrun.configure(state="normal")
+            self.btn_canary.configure(state="normal")
+            self._set_scan_buttons_state("normal")
+            self.btn_stop.configure(state="disabled")
+
+            if self.stop_event.is_set():
+                self.card_status.val_label.config(text="🛑 ĐÃ DỪNG")  # type: ignore
+            else:
+                self.card_status.val_label.config(text="🟢 IDLE")  # type: ignore
+        else:
+            self.btn_stop.configure(state="normal")
+            self.card_status.val_label.config(text="🟡 ĐANG CHẠY HÀNG ĐỢI...")  # type: ignore
 
         dur_str = getattr(self.worker_thread, "duration_str", "—") if self.worker_thread else "—"
 
@@ -2226,16 +2713,122 @@ class FacebookBotGUI(tk.Tk if tk else object):
         state_mgr = StateManager(str(self.history_file))
         return state_mgr.get_summary(self.config.cooldown_hours)
 
-    def _on_closing(self):
-        """Ensures safe teardown of threads on window close."""
+    # =========================================================================
+    # BACKGROUND EXECUTION & SYSTEM TRAY
+    # =========================================================================
+
+    def _hide_to_background(self):
+        """Hides the main window to run silently in the background."""
+        self.withdraw()
+        self.logger.info("🕶️ Đã ẩn giao diện Facebook Bot xuống nền. Các tác vụ vẫn tiếp tục chạy.")
+        self._setup_tray_icon()
+
+    def _restore_from_background(self, *args):
+        """Restores the main window from background."""
+        if hasattr(self, "tray_icon") and self.tray_icon:
+            try:
+                self.tray_icon.stop()
+                self.tray_icon = None
+            except Exception:
+                pass
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+        self.logger.info("🖥️ Đã khôi phục giao diện Facebook Bot từ chế độ chạy ngầm.")
+
+    def _setup_tray_icon(self):
+        """Sets up a system tray icon if pystray and PIL are available."""
+        try:
+            import pystray
+            from PIL import Image, ImageDraw
+
+            icon_img = None
+            icon_path = self.repo_dir / "images" / "icon.png"
+            if icon_path.exists():
+                try:
+                    icon_img = Image.open(str(icon_path))
+                except Exception:
+                    pass
+
+            if icon_img is None:
+                icon_img = Image.new("RGBA", (64, 64), color=(0, 0, 0, 0))
+                draw = ImageDraw.Draw(icon_img)
+                draw.ellipse((4, 4, 60, 60), fill=(24, 119, 242))
+                draw.text((26, 16), "F", fill=(255, 255, 255))
+
+            menu = pystray.Menu(
+                pystray.MenuItem("🖥️ Mở Giao Diện", lambda icon, item: self.after(0, self._restore_from_background)),
+                pystray.MenuItem(
+                    "📊 Trạng Thái",
+                    pystray.Menu(
+                        pystray.MenuItem(
+                            lambda text: "Đang Chạy" if ((hasattr(self, "dispatcher") and self.dispatcher.is_running) or (self.worker_thread and self.worker_thread.is_alive())) else "Đang Nghỉ",
+                            None,
+                            enabled=False,
+                        )
+                    ),
+                ),
+                pystray.MenuItem("🛑 Dừng Bot", lambda icon, item: self.after(0, self._stop_bot_flow)),
+                pystray.MenuItem("🚪 Thoát Hoàn Toàn", lambda icon, item: self.after(0, self._force_exit)),
+            )
+            self.tray_icon = pystray.Icon("FacebookBot", icon_img, "Facebook Automation Bot", menu)
+            threading.Thread(target=self.tray_icon.run, daemon=True, name="SystemTrayThread").start()
+        except Exception as e:
+            self.logger.debug("System tray (pystray) không khả dụng: %s", e)
+            self.tray_icon = None
+
+    def _force_exit(self):
+        """Force stops bot and closes application from tray."""
+        self.stop_event.set()
+        if hasattr(self, "dispatcher"):
+            self.dispatcher.cancel_all()
         if self.worker_thread and self.worker_thread.is_alive():
-            if not messagebox.askyesno("Thoát Ứng Dụng", "Bot đang chạy! Bạn có chắc muốn dừng bot và thoát không?"):
+            self.worker_thread.join(timeout=1.0)
+        if hasattr(self, "tray_icon") and self.tray_icon:
+            try:
+                self.tray_icon.stop()
+                self.tray_icon = None
+            except Exception:
+                pass
+        self.destroy()
+        sys.exit(0)
+
+    def _on_closing(self):
+        """Ensures safe teardown or prompt to minimize to background on window close."""
+        is_busy = (hasattr(self, "dispatcher") and self.dispatcher.is_running) or (
+            self.worker_thread and self.worker_thread.is_alive()
+        )
+        if is_busy:
+            ans = messagebox.askyesnocancel(
+                "Đóng Ứng Dụng",
+                "Bot đang chạy các tác vụ nền!\n\n"
+                "• Chọn [Yes]  : ẨN XUỐNG NỀN để bot tiếp tục chạy.\n"
+                "• Chọn [No]   : DỪNG BOT và THOÁT hoàn toàn.\n"
+                "• Chọn [Cancel]: Hủy thao tác (ở lại giao diện).",
+            )
+            if ans is None:
+                # Cancel clicked: return to UI
                 return
+            elif ans is True:
+                # Yes clicked: minimize to background
+                self._hide_to_background()
+                return
+
+            # No clicked: stop bot and proceed to exit
             self.stop_event.set()
-            self.worker_thread.join(timeout=2.0)
+            if hasattr(self, "dispatcher"):
+                self.dispatcher.cancel_all()
+            if self.worker_thread and self.worker_thread.is_alive():
+                self.worker_thread.join(timeout=2.0)
 
         if self.telegram:
             self.telegram.stop_polling()
+
+        if hasattr(self, "tray_icon") and self.tray_icon:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
 
         if hasattr(self, "queue_handler"):
             logging.getLogger().removeHandler(self.queue_handler)

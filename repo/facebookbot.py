@@ -309,7 +309,7 @@ class FacebookBot:
         Persists authenticated session permanently into FacebookBotProfile for subsequent runs.
         """
         self.logger.info("🔑 Khởi động phiên tương tác đăng nhập Facebook...")
-        with get_driver(self.config) as driver:
+        with get_driver(self.config, headless=False) as driver:
             if stop_event and stop_event.is_set():
                 self.logger.warning("🛑 Dừng phiên tương tác đăng nhập theo yêu cầu (Stop Requested).")
                 return False
@@ -800,6 +800,9 @@ class FacebookBot:
             return True
 
         self.logger.warning("⚠️ Chưa phát hiện session đăng nhập trên profile hiện tại.")
+        if getattr(self.config, "headless", False):
+            self.logger.warning("⚠️ Đang chạy ở chế độ Headless (ẩn Chrome) nhưng session đăng nhập chưa có hoặc đã hết hạn.")
+            self.logger.info("👉 Hãy sử dụng tính năng 'Đăng Nhập Facebook' trên giao diện hoặc chạy lại không dùng --headless để đăng nhập lưu session.")
         self.logger.info("🔑 Tự động điền thông tin đăng nhập và mở phiên cho người dùng chủ động CAPTCHA / 2FA...")
         logged_in = self.perform_login_flow(
             driver,

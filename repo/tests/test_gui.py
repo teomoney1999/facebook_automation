@@ -893,7 +893,8 @@ class TestGUIComponents(unittest.TestCase):
             app.cfg_entries["JOIN_DELAY_MAX"].insert(0, "30.0")
             app.cfg_entries["JOIN_LIMIT"].delete(0, tk.END)
             app.cfg_entries["JOIN_LIMIT"].insert(0, "8")
-            app._save_env_config()
+            with mock.patch("tkinter.messagebox.showinfo"):
+                app._save_env_config()
 
             saved_env = env_file.read_text(encoding="utf-8")
             self.assertIn("JOIN_DELAY_MIN=12.0", saved_env)
@@ -981,7 +982,7 @@ class TestGUIComponents(unittest.TestCase):
             state_mgr = app.state_manager if hasattr(app, "state_manager") else None
             from services.state_manager import StateManager
             sm = StateManager(str(app.history_file))
-            sm.record_post("https://facebook.com/groups/alpha", "SUCCESS", post_time=datetime.now(timezone.utc).isoformat())
+            sm.record_post("https://facebook.com/groups/alpha", "SUCCESS")
 
             app.tree_groups.selection_set([children[0]])
             with mock.patch("tkinter.messagebox.askyesno", return_value=True) as mock_ask, mock.patch.object(app, "_launch_worker") as mock_launch:
