@@ -18,7 +18,7 @@ if errorlevel 1 (
 )
 
 REM 2. Kiem tra PyInstaller
-python -m pyinstaller --version >nul 2>&1
+pyinstaller --version >nul 2>&1
 if errorlevel 1 (
     echo [WARNING] PyInstaller chua duoc cai dat. Dang tien hanh cai dat...
     python -m pip install pyinstaller
@@ -31,7 +31,7 @@ if exist dist rmdir /s /q dist
 
 REM 4. Tien hanh dong goi voi facebook_bot.spec
 echo [INFO] Dang dong goi bang PyInstaller voi facebook_bot.spec...
-python -m pyinstaller --clean facebook_bot.spec
+pyinstaller --clean facebook_bot.spec
 
 REM 5. Kiem tra ket qua
 if exist "dist\FacebookBot\FacebookBot.exe" (

@@ -50,7 +50,7 @@ jobs:
           }
 
       - name: Build PyInstaller Application Bundle
-        run: python -m pyinstaller --clean facebook_bot.spec
+        run: pyinstaller --clean facebook_bot.spec
 
       - name: Compile Inno Setup Installer
         shell: pwsh
