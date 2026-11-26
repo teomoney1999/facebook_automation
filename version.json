@@ -10,7 +10,7 @@
   "platforms": {
     "windows": {
       "url": "https://github.com/teomoney1999/facebook_automation/releases/download/v2.0.0/FacebookBotSetup.exe",
-      "sha256": ""
+      "sha256": "2a5f6c203a589ab0c2d6d26dfed4229f7a6f3cc701542b5e96bd8e8e5b95b399"
     }
   }
 }
